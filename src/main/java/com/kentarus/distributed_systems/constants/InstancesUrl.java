@@ -13,8 +13,8 @@ public class InstancesUrl {
     public static final Map<String, String> instances = new HashMap<String, String>() {
         {
             put("firstInstance", firstInstance);
-            put("secondInstance", secondInstance);
-            put("thirdInstance", thirdInstance);
+            // put("secondInstance", secondInstance);
+            // put("thirdInstance", thirdInstance);
             // put("fourthInstance", fourthInstance);
             // put("fifthInstance", fifthInstance);
         }
