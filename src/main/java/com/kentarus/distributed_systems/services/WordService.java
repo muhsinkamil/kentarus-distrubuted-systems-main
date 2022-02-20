@@ -47,7 +47,7 @@ public class WordService {
     }
 
     public String deleteSingleWord(String delWord) {
-        String result = ResponseConstants.OK;
+        String result = ResponseConstants.NOK;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
             result = webClient
@@ -56,6 +56,12 @@ public class WordService {
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+
+            // If the result is OK, then the word is deleted in node, we can break and avoid
+            // further calls
+            if (result.equals(ResponseConstants.OK)) {
+                break;
+            }
         }
         return result;
     }

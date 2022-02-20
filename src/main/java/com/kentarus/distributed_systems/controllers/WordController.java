@@ -36,8 +36,12 @@ public class WordController {
 
     @DeleteMapping(value = "{wordValue}")
     public ResponseEntity<String> deleteWord(@PathVariable String wordValue) {
-        // TODO: Add error handling
-        return ResponseEntity.ok(wordService.deleteSingleWord(wordValue));
+        String result = wordService.deleteSingleWord(wordValue);
+        if (result.equals(ResponseConstants.OK)) {
+            return ResponseEntity.ok().body(ResponseConstants.OK);
+        }
+
+        return ResponseEntity.status(404).body(ResponseConstants.NOK);
     }
 
     @PostMapping()
