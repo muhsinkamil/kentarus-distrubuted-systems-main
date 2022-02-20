@@ -10,13 +10,13 @@ public class InstancesUrl {
     // public static final String fourthInstance = "http://localhost:9000";
     // public static final String fifthInstance = "http://localhost:9000";
 
-    public static final Map<String, String> instances = new HashMap<String, String>() {
+    public static final Map<Integer, String> instances = new HashMap<Integer, String>() {
         {
-            put("firstInstance", firstInstance);
-            // put("secondInstance", secondInstance);
-            // put("thirdInstance", thirdInstance);
-            // put("fourthInstance", fourthInstance);
-            // put("fifthInstance", fifthInstance);
+            put(1, firstInstance);
+            // put("2", secondInstance);
+            // put("3", thirdInstance);
+            // put("4", fourthInstance);
+            // put("5", fifthInstance);
         }
     };
 }

@@ -18,7 +18,7 @@ public class WordService {
     public ArrayList<String> getWords() {
         ArrayList<String> result = new ArrayList<>();
 
-        for (String key : InstancesUrl.instances.keySet()) {
+        for (Integer key : InstancesUrl.instances.keySet()) {
             @SuppressWarnings("unchecked")
             ArrayList<String> instanceResult = webClient.get()
                     .uri(InstancesUrl.instances.get(key) + "/words")
@@ -35,7 +35,7 @@ public class WordService {
     public String deleteAllWords() {
         String result = ResponseConstants.OK;
 
-        for (String key : InstancesUrl.instances.keySet()) {
+        for (Integer key : InstancesUrl.instances.keySet()) {
             result = webClient
                     .delete()
                     .uri(InstancesUrl.instances.get(key) + "/words")
@@ -49,7 +49,7 @@ public class WordService {
     public String deleteSingleWord(String delWord) {
         String result = ResponseConstants.OK;
 
-        for (String key : InstancesUrl.instances.keySet()) {
+        for (Integer key : InstancesUrl.instances.keySet()) {
             result = webClient
                     .delete()
                     .uri(InstancesUrl.instances.get(key) + "/words/" + delWord)
@@ -64,7 +64,7 @@ public class WordService {
         String result = ResponseConstants.OK;
         int startIndex = 0;
 
-        for (String key : InstancesUrl.instances.keySet()) {
+        for (Integer key : InstancesUrl.instances.keySet()) {
             startIndex = webClient
                     .post()
                     .uri(InstancesUrl.instances.get(key) + "/words")
