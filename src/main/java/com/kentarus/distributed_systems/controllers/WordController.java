@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import com.kentarus.distributed_systems.constants.ResponseConstants;
 import com.kentarus.distributed_systems.services.WordService;
+import com.kentarus.distributed_systems.structures.GetWordsResponseStructure;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +24,13 @@ public class WordController {
     WordService wordService;
 
     @GetMapping()
-    public ArrayList<String> getWords() {
-        // TODO: Add error handling
-        return wordService.getWords();
+    public ResponseEntity<ArrayList<String>> getWords() {
+        GetWordsResponseStructure result = wordService.getWords();
+
+        if (result.getStatus().equals(ResponseConstants.NOK)) {
+            return ResponseEntity.status(404).body(result.getWords());
+        }
+        return ResponseEntity.ok().body(result.getWords());
     }
 
     @DeleteMapping()

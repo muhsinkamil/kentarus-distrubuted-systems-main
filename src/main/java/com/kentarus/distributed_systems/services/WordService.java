@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import com.kentarus.distributed_systems.constants.InstancesUrl;
 import com.kentarus.distributed_systems.constants.ResponseConstants;
+import com.kentarus.distributed_systems.structures.GetWordsResponseStructure;
 import com.kentarus.distributed_systems.structures.PostWordsRequestStructure;
 
 import org.springframework.stereotype.Service;
@@ -15,21 +16,28 @@ public class WordService {
 
     private WebClient webClient = WebClient.create();
 
-    public ArrayList<String> getWords() {
+    public GetWordsResponseStructure getWords() {
         ArrayList<String> result = new ArrayList<>();
 
+        // If all the requests fails ( all nodes are de-active), send 500 error
+        // ( TODO: consider making this boolean )
+        String isAnySuccess = ResponseConstants.NOK;
+
         for (Integer key : InstancesUrl.instances.keySet()) {
-            @SuppressWarnings("unchecked")
-            ArrayList<String> instanceResult = webClient.get()
+            GetWordsResponseStructure instanceResult = webClient.get()
                     .uri(InstancesUrl.instances.get(key) + "/words")
                     .retrieve()
-                    .bodyToMono(ArrayList.class)
+                    .bodyToMono(GetWordsResponseStructure.class)
                     .block();
 
-            result.addAll(instanceResult);
+            result.addAll(instanceResult.getWords());
+
+            if (instanceResult.getStatus().equals(ResponseConstants.OK)) {
+                isAnySuccess = ResponseConstants.OK;
+            }
         }
 
-        return result;
+        return new GetWordsResponseStructure(isAnySuccess, result);
     }
 
     public String deleteAllWords() {
