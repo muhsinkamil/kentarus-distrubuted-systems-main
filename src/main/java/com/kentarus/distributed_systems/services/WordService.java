@@ -82,7 +82,7 @@ public class WordService {
     }
 
     public String postMultipleWords(ArrayList<String> words) {
-        String result = ResponseConstants.OK;
+        String result = ResponseConstants.NOK;
         int startIndex = 0;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
@@ -97,6 +97,12 @@ public class WordService {
             if (startIndex >= words.size()) {
                 break;
             }
+        }
+
+        // If any of the posted words is saved, ( atleast one node accepted connection
+        // and had space to save )
+        if (startIndex > 0) {
+            result = ResponseConstants.OK;
         }
 
         return result;

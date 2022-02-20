@@ -53,10 +53,15 @@ public class WordController {
 
     @PostMapping()
     public ResponseEntity<String> postWords(@RequestBody ArrayList<String> words) {
-        // TODO: Add error handling
         if (words.size() < 1) {
-            return ResponseEntity.ok(ResponseConstants.OK);
+            return ResponseEntity.badRequest().body(ResponseConstants.NOK);
         }
-        return ResponseEntity.ok(wordService.postMultipleWords(words));
+
+        String result = wordService.postMultipleWords(words);
+        if (result.equals(ResponseConstants.NOK)) {
+            return ResponseEntity.status(404).body(result);
+        }
+
+        return ResponseEntity.ok().body(result);
     }
 }
