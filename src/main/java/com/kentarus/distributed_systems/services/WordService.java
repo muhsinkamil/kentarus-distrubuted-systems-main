@@ -41,15 +41,22 @@ public class WordService {
     }
 
     public String deleteAllWords() {
-        String result = ResponseConstants.OK;
+        String result = ResponseConstants.NOK;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
-            result = webClient
+            String instanceResult = webClient
                     .delete()
                     .uri(InstancesUrl.instances.get(key) + "/words")
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+
+            // Inactive nodes will return NOK, but that is okay as the delete operation in
+            // active nodes is successful. TODO: If the real DB is used, will have to change
+            // the structure of response
+            if (instanceResult.equals(ResponseConstants.OK)) {
+                result = ResponseConstants.OK;
+            }
         }
         return result;
     }
