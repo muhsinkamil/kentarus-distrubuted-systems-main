@@ -26,7 +26,6 @@ public class WordController {
     @GetMapping()
     public ResponseEntity<ArrayList<String>> getWords() {
         GetWordsResponseStructure result = wordService.getWords();
-
         if (result.getStatus().equals(ResponseConstants.NOK)) {
             return ResponseEntity.status(404).body(result.getWords());
         }
