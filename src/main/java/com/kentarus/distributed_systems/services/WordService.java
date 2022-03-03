@@ -1,6 +1,9 @@
 package com.kentarus.distributed_systems.services;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.TreeMap;
 
 import com.kentarus.distributed_systems.constants.InstancesUrl;
 import com.kentarus.distributed_systems.constants.ResponseConstants;
@@ -14,14 +17,24 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class WordService {
 
+    private static HashMap<Integer, Integer> capacityOfInstances;
+    static {
+        capacityOfInstances = new HashMap<>();
+        for (Integer key : InstancesUrl.instances.keySet()) {
+            capacityOfInstances.put(key, 5);
+        }
+    }
+
+    private TreeMap<Integer, ArrayList<Integer>> metadataOfInstances = new TreeMap<>();
+
     private WebClient webClient = WebClient.create();
 
     public GetWordsResponseStructure getWords() {
         ArrayList<String> result = new ArrayList<>();
 
-        // If all the requests fails ( all nodes are de-active), send 500 error
+        // If any request fails, send 500 error
         // ( TODO: consider making this boolean )
-        String isAnySuccess = ResponseConstants.NOK;
+        String isAnyFailure = ResponseConstants.OK;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
             GetWordsResponseStructure instanceResult = webClient.get()
@@ -32,16 +45,17 @@ public class WordService {
 
             result.addAll(instanceResult.getWords());
 
-            if (instanceResult.getStatus().equals(ResponseConstants.OK)) {
-                isAnySuccess = ResponseConstants.OK;
+            if (instanceResult.getStatus().equals(ResponseConstants.UNAVAILABLE)) {
+                isAnyFailure = ResponseConstants.UNAVAILABLE;
+                break;
             }
         }
 
-        return new GetWordsResponseStructure(isAnySuccess, result);
+        return new GetWordsResponseStructure(isAnyFailure, result);
     }
 
     public String deleteAllWords() {
-        String result = ResponseConstants.NOK;
+        String result = ResponseConstants.OK;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
             String instanceResult = webClient
@@ -54,56 +68,126 @@ public class WordService {
             // Inactive nodes will return NOK, but that is okay as the delete operation in
             // active nodes is successful. TODO: If the real DB is used, will have to change
             // the structure of response
-            if (instanceResult.equals(ResponseConstants.OK)) {
-                result = ResponseConstants.OK;
+            if (instanceResult.equals(ResponseConstants.UNAVAILABLE)) {
+                result = ResponseConstants.UNAVAILABLE;
             }
         }
+
+        if (result.equals(ResponseConstants.OK)) {
+            // Restore the spaces
+            for (Integer key : InstancesUrl.instances.keySet()) {
+                capacityOfInstances.put(key, 5);
+            }
+        }
+
         return result;
     }
 
     public String deleteSingleWord(String delWord) {
         String result = ResponseConstants.NOK;
 
-        for (Integer key : InstancesUrl.instances.keySet()) {
-            result = webClient
-                    .delete()
-                    .uri(InstancesUrl.instances.get(key) + "/words/" + delWord)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+        int hashedWord = delWord.hashCode();
+        ArrayList<Integer> instanceIdArray = metadataOfInstances.get(hashedWord);
+        int instanceIdOfOldestSave = instanceIdArray.get(0);
+        String instanceUrlToHit = InstancesUrl.instances.get(instanceIdOfOldestSave);
 
-            // If the result is OK, then the word is deleted in node, we can break and avoid
-            // further calls
-            if (result.equals(ResponseConstants.OK)) {
-                break;
-            }
+        // for (Integer key : InstancesUrl.instances.keySet()) {
+        result = webClient
+                .delete()
+                .uri(instanceUrlToHit + "/words/" + delWord)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        if (result.equals(ResponseConstants.OK)) {
+            instanceIdArray.remove(0);
+            metadataOfInstances.put(hashedWord, instanceIdArray);
+            capacityOfInstances.put(instanceIdOfOldestSave, capacityOfInstances.get(instanceIdOfOldestSave) + 1);
         }
+        // // If the result is OK, then the word is deleted in node, we can break and
+        // avoid
+        // // further calls
+        // if (result.equals(ResponseConstants.OK)) {
+        // break;
+        // }
+        // }
         return result;
     }
-
     public String postMultipleWords(ArrayList<String> words) {
-        String result = ResponseConstants.NOK;
+        String result = ResponseConstants.OK;
+
+        // Prepare empty list of words to post to instances
+        HashMap<Integer, ArrayList<String>> wordsForInstances = new HashMap<>();
+        for (Integer key : InstancesUrl.instances.keySet()) {
+            wordsForInstances.put(key, new ArrayList<>());
+        }
+
+        for (String word : words) {
+            boolean spaceLeftAtInstances = false;
+
+            instancesLoop:
+            for(int key: InstancesUrl.instances.keySet()){
+                if (capacityOfInstances.get(key) > 0) {
+                    int hashedWord = word.hashCode();
+                    if (metadataOfInstances.containsKey(hashedWord)) {
+                        ArrayList<Integer> nodesList = metadataOfInstances.get(hashedWord);
+                        nodesList.add(key);
+                        metadataOfInstances.put(hashedWord, nodesList);
+                    } else {
+                        metadataOfInstances.put(hashedWord, new ArrayList<Integer>(Arrays.asList(key)));
+                    }
+
+                    spaceLeftAtInstances = true;
+
+                    ArrayList<String> wordsListAtCurrInstance = wordsForInstances.get(key);
+                    wordsListAtCurrInstance.add(word);
+                    wordsForInstances.put(key, wordsListAtCurrInstance);
+
+                    capacityOfInstances.put(key, capacityOfInstances.get(key) - 1);
+                    // Since the word already goes in one instance, break out of instances loop
+                    break instancesLoop;
+                }
+            }
+            if (!spaceLeftAtInstances)
+                break;
+        }
+
         int startIndex = 0;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
             startIndex = webClient
                     .post()
                     .uri(InstancesUrl.instances.get(key) + "/words")
-                    .body(BodyInserters.fromValue(new PostWordsRequestStructure(words, startIndex)))
+                    .body(BodyInserters
+                            .fromValue(new PostWordsRequestStructure(wordsForInstances.get(key), 0)))
                     .retrieve()
                     .bodyToMono(Integer.class)
                     .block();
 
-            if (startIndex >= words.size()) {
+            if (startIndex < 0) {
+                result = ResponseConstants.UNAVAILABLE;
                 break;
             }
+
+            // Implementation 1:
+            // All the words are posted
+            // if (startIndex >= words.size()) {
+            // break;
+            // }
+
+            // Implementation 2: Since all the words should be posted, we don't need the
+            // above check
         }
 
-        // If any of the posted words is saved, ( atleast one node accepted connection
+        // Implementation 1: If any of the posted words is saved, ( atleast one node
+        // accepted connection
         // and had space to save )
-        if (startIndex > 0) {
-            result = ResponseConstants.OK;
-        }
+        // if (startIndex > 0) {
+        // result = ResponseConstants.OK;
+        // }
+
+        // Implementation 2: All words should accept connection => If any fails, it will
+        // send UNAVAILABLE
 
         return result;
     }

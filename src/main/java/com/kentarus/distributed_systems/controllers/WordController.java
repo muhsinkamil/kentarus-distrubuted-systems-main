@@ -26,8 +26,8 @@ public class WordController {
     @GetMapping()
     public ResponseEntity<ArrayList<String>> getWords() {
         GetWordsResponseStructure result = wordService.getWords();
-        if (result.getStatus().equals(ResponseConstants.NOK)) {
-            return ResponseEntity.status(404).body(result.getWords());
+        if (result.getStatus().equals(ResponseConstants.UNAVAILABLE)) {
+            return ResponseEntity.status(500).body(result.getWords());
         }
         return ResponseEntity.ok().body(result.getWords());
     }
@@ -35,8 +35,8 @@ public class WordController {
     @DeleteMapping()
     public ResponseEntity<String> deleteWords() {
         String result = wordService.deleteAllWords();
-        if (result.equals(ResponseConstants.NOK)) {
-            return ResponseEntity.status(404).body(result);
+        if (result.equals(ResponseConstants.UNAVAILABLE)) {
+            return ResponseEntity.status(500).body(result);
         }
         return ResponseEntity.ok(result);
     }
@@ -57,6 +57,12 @@ public class WordController {
         }
 
         String result = wordService.postMultipleWords(words);
+
+        if(result.equals(ResponseConstants.UNAVAILABLE)){
+            return ResponseEntity.status(500).body(result);
+        }
+
+        // Not required in Implementation 2: 
         if (result.equals(ResponseConstants.NOK)) {
             return ResponseEntity.status(404).body(result);
         }
