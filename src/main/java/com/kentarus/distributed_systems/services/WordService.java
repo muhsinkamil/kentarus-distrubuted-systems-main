@@ -37,11 +37,7 @@ public class WordService {
         String isAnyFailure = ResponseConstants.OK;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
-            GetWordsResponseStructure instanceResult = webClient.get()
-                    .uri(InstancesUrl.instances.get(key) + "/words")
-                    .retrieve()
-                    .bodyToMono(GetWordsResponseStructure.class)
-                    .block();
+            GetWordsResponseStructure instanceResult = getWordsHelper(InstancesUrl.instances.get(key));
 
             result.addAll(instanceResult.getWords());
 
@@ -57,19 +53,34 @@ public class WordService {
     public String deleteAllWords() {
         String result = ResponseConstants.OK;
 
+        ArrayList<Integer> successInstances = new ArrayList<>();
+
+        deleteWordsLoop:
         for (Integer key : InstancesUrl.instances.keySet()) {
+            String instanceUrl = InstancesUrl.instances.get(key);
             String instanceResult = webClient
                     .delete()
-                    .uri(InstancesUrl.instances.get(key) + "/words")
+                    .uri(instanceUrl + "/words")
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-
+                
             // Inactive nodes will return NOK, but that is okay as the delete operation in
             // active nodes is successful. TODO: If the real DB is used, will have to change
             // the structure of response
             if (instanceResult.equals(ResponseConstants.UNAVAILABLE)) {
                 result = ResponseConstants.UNAVAILABLE;
+
+                //Consider rollback
+                // for(int instance : successInstances){
+                //     String instanceUrl = InstancesUrl.instances.get(instance);
+                //     ArrayList<String> instanceWords = getWordsHelper(instanceUrl).getWords();
+                //     postWordsHelper(instanceWords, instanceUrl);
+                // }   
+
+                break deleteWordsLoop;
+            } else {
+                successInstances.add(key);
             }
         }
 
@@ -113,6 +124,7 @@ public class WordService {
         // }
         return result;
     }
+
     public String postMultipleWords(ArrayList<String> words) {
         String result = ResponseConstants.OK;
 
@@ -125,8 +137,7 @@ public class WordService {
         for (String word : words) {
             boolean spaceLeftAtInstances = false;
 
-            instancesLoop:
-            for(int key: InstancesUrl.instances.keySet()){
+            instancesLoop: for (int key : InstancesUrl.instances.keySet()) {
                 if (capacityOfInstances.get(key) > 0) {
                     int hashedWord = word.hashCode();
                     if (metadataOfInstances.containsKey(hashedWord)) {
@@ -155,14 +166,7 @@ public class WordService {
         int startIndex = 0;
 
         for (Integer key : InstancesUrl.instances.keySet()) {
-            startIndex = webClient
-                    .post()
-                    .uri(InstancesUrl.instances.get(key) + "/words")
-                    .body(BodyInserters
-                            .fromValue(new PostWordsRequestStructure(wordsForInstances.get(key), 0)))
-                    .retrieve()
-                    .bodyToMono(Integer.class)
-                    .block();
+            startIndex = postWordsHelper(wordsForInstances.get(key), InstancesUrl.instances.get(key));
 
             if (startIndex < 0) {
                 result = ResponseConstants.UNAVAILABLE;
@@ -190,5 +194,26 @@ public class WordService {
         // send UNAVAILABLE
 
         return result;
+    }
+
+    private int postWordsHelper(ArrayList<String> words, String instanceUrl) {
+        int result = webClient
+                .post()
+                .uri(instanceUrl + "/words")
+                .body(BodyInserters
+                        .fromValue(new PostWordsRequestStructure(words, 0)))
+                .retrieve()
+                .bodyToMono(Integer.class)
+                .block();
+
+        return result;
+    }
+
+    private GetWordsResponseStructure getWordsHelper(String instanceUrl) {
+        return webClient.get()
+                .uri(instanceUrl + "/words")
+                .retrieve()
+                .bodyToMono(GetWordsResponseStructure.class)
+                .block();
     }
 }
