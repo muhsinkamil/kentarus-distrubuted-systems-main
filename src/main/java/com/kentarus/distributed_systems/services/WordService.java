@@ -10,12 +10,16 @@ import com.kentarus.distributed_systems.constants.ResponseConstants;
 import com.kentarus.distributed_systems.structures.GetWordsResponseStructure;
 import com.kentarus.distributed_systems.structures.PostWordsRequestStructure;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 public class WordService {
+
+    @Autowired
+    NodeService nodeService;
 
     private static HashMap<Integer, Integer> capacityOfInstances;
     static {
@@ -30,6 +34,10 @@ public class WordService {
     private WebClient webClient = WebClient.create();
 
     public GetWordsResponseStructure getWords() {
+        if (nodeService.disabledNodes.size() > 0) {
+            return new GetWordsResponseStructure(ResponseConstants.UNAVAILABLE, new ArrayList<String>());
+        }
+
         ArrayList<String> result = new ArrayList<>();
 
         // If any request fails, send 500 error
@@ -40,23 +48,19 @@ public class WordService {
             GetWordsResponseStructure instanceResult = getWordsHelper(InstancesUrl.instances.get(key));
 
             result.addAll(instanceResult.getWords());
-
-            if (instanceResult.getStatus().equals(ResponseConstants.UNAVAILABLE)) {
-                isAnyFailure = ResponseConstants.UNAVAILABLE;
-                break;
-            }
         }
 
         return new GetWordsResponseStructure(isAnyFailure, result);
     }
 
     public String deleteAllWords() {
+        if (nodeService.disabledNodes.size() > 0) {
+            return ResponseConstants.UNAVAILABLE;
+        }
+
         String result = ResponseConstants.OK;
 
-        ArrayList<Integer> successInstances = new ArrayList<>();
-
-        deleteWordsLoop:
-        for (Integer key : InstancesUrl.instances.keySet()) {
+        deleteWordsLoop: for (Integer key : InstancesUrl.instances.keySet()) {
             String instanceUrl = InstancesUrl.instances.get(key);
             String instanceResult = webClient
                     .delete()
@@ -64,23 +68,21 @@ public class WordService {
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-                
+
             // Inactive nodes will return NOK, but that is okay as the delete operation in
             // active nodes is successful. TODO: If the real DB is used, will have to change
             // the structure of response
             if (instanceResult.equals(ResponseConstants.UNAVAILABLE)) {
                 result = ResponseConstants.UNAVAILABLE;
 
-                //Consider rollback
+                // Consider rollback
                 // for(int instance : successInstances){
-                //     String instanceUrl = InstancesUrl.instances.get(instance);
-                //     ArrayList<String> instanceWords = getWordsHelper(instanceUrl).getWords();
-                //     postWordsHelper(instanceWords, instanceUrl);
-                // }   
+                // String instanceUrl = InstancesUrl.instances.get(instance);
+                // ArrayList<String> instanceWords = getWordsHelper(instanceUrl).getWords();
+                // postWordsHelper(instanceWords, instanceUrl);
+                // }
 
                 break deleteWordsLoop;
-            } else {
-                successInstances.add(key);
             }
         }
 
@@ -126,6 +128,10 @@ public class WordService {
     }
 
     public String postMultipleWords(ArrayList<String> words) {
+        if (nodeService.disabledNodes.size() > 0) {
+            return ResponseConstants.UNAVAILABLE;
+        }
+
         String result = ResponseConstants.OK;
 
         // Prepare empty list of words to post to instances
